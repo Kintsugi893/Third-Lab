@@ -1,100 +1,98 @@
 import math
 
-def main():
-    # Ввод функции
+def get_function():
     while True:
         try:
-            func_str = input("Введите интеграл f(x): ")
-            break
+            func_str = input("Введите функцию f(x): ")
+            return lambda x: eval(func_str, {"x": x, **math.__dict__})
         except Exception as e:
             print(f"Ошибка ввода функции: {e}. Попробуйте снова.")
 
-    # Ввод нижнего предела a
+def get_float_input(prompt, error_msg):
     while True:
         try:
-            a_str = input("Введите нижний предел a: ").replace(',', '.')
-            a = eval(a_str, {"__builtins__": None}, {"math": math, **math.__dict__})
-            break
-        except (NameError, SyntaxError, ValueError) as e:
-            print(f"Ошибка: {e}. Введите число или допустимое выражение.")
+            value_str = input(prompt).replace(',', '.')
+            return eval(value_str, {"__builtins__": None}, {"math": math, **math.__dict__})
+        except Exception as e:
+            print(f"{error_msg}: {e}")
 
-    # Ввод верхнего предела b
-    while True:
-        try:
-            b_str = input("Введите верхний предел b: ").replace(',', '.')
-            b = eval(b_str, {"__builtins__": None}, {"math": math, **math.__dict__})
-            break
-        except (NameError, SyntaxError, ValueError) as e:
-            print(f"Ошибка: {e}. Введите число или допустимое выражение.")
+def get_limit(name):
+    return get_float_input(
+        f"Введите {name} предел: ",
+        "Ошибка: Введите число или допустимое выражение"
+    )
 
-    # Ввод точности
+def get_eps():
     while True:
         try:
             eps_str = input("Введите требуемую точность eps (например, 1e-6): ").replace(',', '.')
             eps = float(eps_str)
-            if eps <= 0:
+            if eps > 0:
+                return eps
+            else:
                 raise ValueError("Точность должна быть положительным числом.")
-            break
         except ValueError as e:
-            print(f"Ошибка: {e}. Введите число.")
+            print(f"Ошибка: {e}")
 
-    # Автоматическое определение точности вывода
+def format_result(value, precision):
+    formatted = f"{value:.{precision}f}"
+    if '.' in formatted:
+        return formatted.rstrip('0').rstrip('.')
+    return formatted
+
+def simpsons_rule(f, a, b, n):
+    if n % 2 != 0:
+        raise ValueError("Количество интервалов должно быть чётным")
+    h = (b - a) / n
+    result = f(a) + f(b)
+    for i in range(1, n):
+        x = a + i * h
+        coefficient = 4 if i % 2 else 2
+        result += coefficient * f(x)
+    return result * h / 3
+
+def compute_integral(f, a, b, eps):
+    max_iterations = 100
+    min_h = 1e-16
+    n = 2
+    prev_result = simpsons_rule(f, a, b, n)
+    
+    for iteration in range(max_iterations):
+        n *= 2
+        current_h = (b - a)/n
+        if current_h < min_h:
+            break
+        current_result = simpsons_rule(f, a, b, n)
+        if abs(current_result - prev_result) <= eps:
+            return current_result, True
+        prev_result = current_result
+    
+    return prev_result, False
+
+def main():
     try:
+        # Ввод данных
+        f = get_function()
+        a = get_limit("нижний")
+        b = get_limit("верхний")
+        eps = get_eps()
+        
+        # Определение точности вывода
         precision = max(0, min(int(math.ceil(-math.log10(eps))), 15))
-    except ValueError:
-        precision = 15
-
-    # Определение функции f(x)
-    def f(x):
-        try:
-            return eval(func_str, {"x": x, **math.__dict__})
-        except Exception as e:
-            raise ValueError(f"Ошибка вычисления функции в x={x}: {e}")
-
-    # Вычисление интеграла с динамическим шагом
-    try:
-        def integrate_simpson(n):
-            if n % 2 != 0:
-                raise ValueError("n должно быть четным")
-            h = (b - a) / n
-            s = f(a) + f(b)
-            for i in range(1, n):
-                x = a + i * h
-                if i % 2 == 0:
-                    s += 2 * f(x)
-                else:
-                    s += 4 * f(x)
-            return s * h / 3
-
-        max_iterations = 100
-        min_h = 1e-16
-        n = 2
-        prev_integral = integrate_simpson(n)
-        iteration = 0
-        current_integral = None
-
-        while iteration < max_iterations:
-            n *= 2
-            current_h = (b - a) / n
-            if current_h < min_h:
-                break
-            try:
-                current_integral = integrate_simpson(n)
-            except Exception as e:
-                raise ValueError(f"Ошибка вычисления при n={n}: {e}")
-            if abs(current_integral - prev_integral) <= eps:
-                break
-            prev_integral = current_integral
-            iteration += 1
-
-        # Проверка на достижение точности
-        if iteration >= max_iterations or current_h <= min_h:
-            print(f"Не удалось достичь точности eps={eps}.")
-        else:
-            # Форматирование результата
-            formatted_result = f"{current_integral:.{precision}f}".rstrip('0').rstrip('.') if '.' in f"{current_integral:.{precision}f}" else f"{current_integral:.0f}"
+        
+        # Вычисление интеграла
+        result, success = compute_integral(f, a, b, eps)
+        
+        # Форматирование результата
+        formatted_result = format_result(result, precision)
+        
+        # Вывод
+        if success:
             print(f"Интеграл от {a} до {b} с точностью eps={eps} равен {formatted_result}")
-
+        else:
+            print(f"Не удалось достичь точности eps={eps}")
+            print(f"Приблизительное значение интеграла: {formatted_result}")
+            
     except Exception as e:
         print(f"Ошибка: {e}")
 
